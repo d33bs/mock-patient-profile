@@ -7,10 +7,11 @@ patient-derived fibroblast Cell Painting screen using fully open datasets
 coSMicQC, pycytominer), with Parquet as the canonical storage format.
 """
 
-from . import bbbc021, paths, schema
+from . import bbbc021, paths, patients, schema
 from .bbbc021 import build_dev_subset, download_bbbc021_metadata, prepare_dev_subset
 from .main import show_message
 from .paths import DataPaths, get_data_paths
+from .patients import assign_patients, build_patient_table
 from .schema import (
     CHANNELS,
     COMPARTMENTS,

@@ -20,18 +20,20 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
+# Runtime stack: a Parquet-first, vendor-neutral data layer (pyarrow/polars/
+# duckdb/numpy/pandas) plus the Way Science morphology profiling ecosystem
+# (cytotable/cytodataframe/cosmicqc/pycytominer). tabulate is required at import
+# time by cosmicqc but undeclared upstream; fire/jinja2 power the CLI/reports.
 dependencies = [
   "cosmicqc",
   "cytodataframe",
-  # Way Science morphology profiling ecosystem
   "cytotable",
   "duckdb>=1",
-  # CLI + templating
   "fire>=0.7",
   "jinja2>=3.1.6",
+  "numpy>=1.26",
   "pandas>=2.2.3",
   "polars>=1",
-  # canonical, vendor-neutral data stack (Parquet-first)
   "pyarrow>=16",
   "pycytominer",
   "tabulate>=0.9",
