@@ -13,6 +13,7 @@ from . import (
     cytotable_io,
     paths,
     patients,
+    qc,
     schema,
     synthetic,
 )
@@ -22,6 +23,7 @@ from .cytotable_io import build_single_cell_parquet, convert_cellprofiler_csvs
 from .main import show_message
 from .paths import DataPaths, get_data_paths
 from .patients import assign_patients, build_patient_table
+from .qc import detect_outliers, qc_report
 from .schema import (
     CHANNELS,
     COMPARTMENTS,
