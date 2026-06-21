@@ -23,7 +23,10 @@ Design goals
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 #: Prefix marking a column as metadata rather than a morphology feature. This
 #: matches the convention used by pycytominer and CytoTable.
@@ -82,7 +85,9 @@ CANONICAL_METADATA_TYPES: dict[str, pa.DataType] = {
     "Metadata_Plate": pa.string(),
     "Metadata_Well": pa.string(),
     "Metadata_Site": pa.int32(),
+    "Metadata_Replicate": pa.int32(),
     # object identity (CellProfiler-style)
+    "Metadata_TableNumber": pa.string(),
     "Metadata_ImageNumber": pa.int32(),
     "Metadata_ObjectNumber": pa.int32(),
     # perturbation (BBBC021 treatment)
@@ -114,6 +119,7 @@ SAMPLE_METADATA: tuple[str, ...] = (
     "Metadata_Batch",
     "Metadata_Plate",
     "Metadata_Well",
+    "Metadata_Replicate",
     "Metadata_Compound",
     "Metadata_Concentration",
     "Metadata_MoA",
@@ -269,6 +275,30 @@ def profile_schema(
     return pa.schema(fields)
 
 
+def image_schema() -> pa.Schema:
+    """Schema for the site-level BBBC021 image/treatment table.
+
+    One row per imaging site (field of view), carrying the real BBBC021
+    plate/well/treatment metadata used to anchor the synthetic single cells.
+    This is the canonical analog of a CellProfiler ``Image`` table.
+    """
+    return pa.schema(
+        _metadata_fields(
+            (
+                "Metadata_TableNumber",
+                "Metadata_ImageNumber",
+                "Metadata_Plate",
+                "Metadata_Well",
+                "Metadata_Site",
+                "Metadata_Replicate",
+                "Metadata_Compound",
+                "Metadata_Concentration",
+                "Metadata_MoA",
+            )
+        )
+    )
+
+
 def patient_schema() -> pa.Schema:
     """Schema for ``patient.parquet`` (one row per synthetic patient)."""
     return pa.schema(
@@ -390,3 +420,77 @@ def require_schema(
         raise SchemaValidationError(
             "table does not conform to expected schema: " + "; ".join(problems)
         )
+
+
+def cast_to_schema(
+    table: pa.Table,
+    expected: pa.Schema,
+    *,
+    allow_extra_columns: bool = False,
+) -> pa.Table:
+    """Coerce a table to an expected schema, preserving column order.
+
+    This smooths over frontend interop quirks (for example, Polars emits
+    ``large_string`` while the canonical schema uses ``string``, and integer
+    widths often differ) by explicitly casting each canonical column to its
+    declared Arrow type.
+
+    Args:
+        table: The Arrow table to coerce (e.g. from ``polars.DataFrame.to_arrow``
+            or ``pyarrow.Table.from_pandas``).
+        expected: The target schema.
+        allow_extra_columns: When ``True``, columns not in ``expected`` (such as
+            dynamically named feature columns) are appended after the canonical
+            columns unchanged.
+
+    Returns:
+        A new table whose canonical columns match ``expected`` exactly.
+
+    Raises:
+        SchemaValidationError: If a required column is missing.
+    """
+    missing = [name for name in expected.names if name not in table.column_names]
+    if missing:
+        raise SchemaValidationError(f"cannot cast; missing columns: {sorted(missing)}")
+
+    casted = table.select(list(expected.names)).cast(expected)
+    if allow_extra_columns:
+        for name in table.column_names:
+            if name not in expected.names:
+                casted = casted.append_column(name, table.column(name))
+    return casted
+
+
+def write_parquet(
+    table: pa.Table,
+    path: str | Path,
+    *,
+    schema: pa.Schema | None = None,
+    allow_extra_columns: bool = False,
+) -> Path:
+    """Write an Arrow table to Parquet, optionally enforcing a schema.
+
+    Parent directories are created as needed. When ``schema`` is provided the
+    table is cast to it first (see :func:`cast_to_schema`), guaranteeing that
+    on-disk Parquet always matches the canonical data model.
+
+    Args:
+        table: The Arrow table to persist.
+        path: Destination ``.parquet`` path.
+        schema: Optional canonical schema to enforce.
+        allow_extra_columns: Forwarded to :func:`cast_to_schema`.
+
+    Returns:
+        The resolved destination path.
+    """
+    dest = Path(path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if schema is not None:
+        table = cast_to_schema(table, schema, allow_extra_columns=allow_extra_columns)
+    pq.write_table(table, dest)
+    return dest
+
+
+def read_parquet(path: str | Path) -> pa.Table:
+    """Read a Parquet file into an Arrow table."""
+    return pq.read_table(Path(path))
