@@ -93,6 +93,9 @@ lint.select = [
   "SIM",
   "W",
 ]
+# Heavy optional deps (CytoTable/coSMicQC/pycytominer) are imported inside
+# functions on purpose, to keep `import mock_patient_profile` lightweight.
+lint.ignore = [ "PLC0415" ]
 # Ignore `F401` (unused imports) for `__init__.py` file
 lint.per-file-ignores."__init__.py" = [ "F401" ]
 # Tests use literal expected values and pytest fixture args idiomatically;
