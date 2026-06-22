@@ -21,8 +21,8 @@ sys.path.insert(0, basedir)
 
 project = "mock-patient-profile"
 # is used here due to sphinx decision-making: https://github.com/sphinx-doc/sphinx/issues/8132
-copyright = "2024, DBMI Community"  # noqa: A001
-author = "DBMI Community"
+copyright = "2026, Dave Bunten"  # noqa: A001
+author = "Dave Bunten"
 
 # -- General configuration ---------------------------------------------------
 

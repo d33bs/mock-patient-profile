@@ -1,14 +1,11 @@
 ---
-# used for publishing documentation on push to main or published release
+# used for publishing documentation on push to main
 name: publish docs
 
 on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
 
 jobs:
   build:

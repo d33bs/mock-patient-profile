@@ -84,36 +84,17 @@ We will check for accuracy, style, code coverage, and scope.
 
 ## Versioning
 
-We use [`setuptools-scm`](https://github.com/pypa/setuptools-scm) to help version this software through [`PEP 440`](https://peps.python.org/pep-0440/) standards and [semver.org](https://semver.org/) standards.
-Configuration for versioning is found within the `pyproject.toml` file.
-All builds for packages include dynamic version data to help label distinct versions of the software.
-`setuptools-scm` uses `git` tags to help distinguish version data.
-We also use the `_version.py` file as a place to persist the version data for occaissions where the `git` history is unavailable or unwanted (this file is only present in package builds).
-Versioning for the project is intended to align with GitHub Releases which provide `git` tag capabilities.
-
-### Releases
-
-We publish source code by using [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases) available [here](https://github.com/d33bs/mock-patient-profile/releases).
-
-#### Release Publishing Process
-
-Several manual and automated steps are involved with publishing releases.
-See below for an overview of how this works.
-
-Notes about [semantic version](https://en.wikipedia.org/wiki/Software_versioning#Semantic_versioning) (semver) specifications: version specifications are controlled through [`setuptools-scm`](https://github.com/pypa/setuptools-scm) to create version data based on [git tags](https://git-scm.com/book/en/v2/Git-Basics-Tagging) and commits.
-Release git tags are automatically applied through [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases) and related inferred changes from [`release-drafter`](https://github.com/release-drafter/release-drafter).
-
-1. Open a pull request and use a repository label for `release-<semver release type>` to label the pull request for visibility with [`release-drafter`](https://github.com/release-drafter/release-drafter).
-1. On merging the pull request for the release, a [GitHub Actions workflow](https://docs.github.com/en/actions/using-workflows) defined in `draft-release.yml` leveraging [`release-drafter`](https://github.com/release-drafter/release-drafter) will draft a release for maintainers.
-1. The draft GitHub release will include a version tag based on the GitHub PR label applied and `release-drafter`.
-1. Make modifications as necessary to the draft GitHub release, then publish the release (the draft release does not normally need additional modifications).
-1. On publishing the release, another GitHub Actions workflow defined in `publish-pypi.yml` will run to build and deploy the Python package to PyPI (utilizing the earlier modified `pyproject.toml` semantic version reference for labeling the release).
+The project version is set statically in the `pyproject.toml` `version` field.
+This is a mock prototype: it is not published to PyPI and does not use automated
+GitHub Releases, so bump the `version` field directly if you need to distinguish
+builds. (Release/publish automation can be added later from the
+[project template](https://github.com/CU-DBMI/template-uv-python-research-software)
+if the project graduates to a published package.)
 
 ## Documentation
 
 Documentation for this project is published using [Sphinx](https://www.sphinx-doc.org) with markdown and Jupyter notebook file compatibility provided by [myst-parser](https://myst-parser.readthedocs.io/en/latest/) and [myst-nb](https://myst-nb.readthedocs.io/en/latest/) to create a "documentation website" (also known as "docsite").
-The docsite is hosted through [GitHub Pages](https://pages.github.com/) and deployed through automated [GitHub Actions](https://docs.github.com/en/actions) jobs which trigger on pushes to the main branch or the publishing of a new release on GitHub.
-Documentation is versioned as outlined earlier sections covering versioning details to help ensure users are able to understand each release independently of one another.
+The docsite is hosted through [GitHub Pages](https://pages.github.com/) and deployed through an automated [GitHub Actions](https://docs.github.com/en/actions) job (`publish-docs.yml`) which triggers on pushes to the main branch.
 
 It can sometimes be useful to test documentation builds locally before proposing changes within a pull request.
 See below for some examples of how to build documentation locally.
