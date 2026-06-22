@@ -1,3 +1,0 @@
-/Users/buntend/Documents/work/mock-patient-profile/runinfo/000/submit_scripts/parsl.htex_default_for_cytotable.block-0.1782069527.423132.sh: line 22: 27727 Terminated: 15          CMD $COUNT
-/Users/buntend/.local/share/uv/python/cpython-3.11.13-macos-aarch64-none/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 7 leaked semaphore objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '

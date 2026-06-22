@@ -1,10 +1,5 @@
 """
 conftest.py for pytest configuration.
+
+Shared fixtures live here; most tests build small in-memory frames directly.
 """
-
-import pytest
-
-
-@pytest.fixture
-def my_data() -> str:
-    return "Hello, differently!"

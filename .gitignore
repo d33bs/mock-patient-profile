@@ -179,3 +179,6 @@ _version.py
 # generated datasets and pipeline outputs (downloaded BBBC021 metadata,
 # synthetic CellProfiler outputs, canonical Parquet, profiles, reports)
 data/
+
+# parsl run directory created by CytoTable conversions
+runinfo/
