@@ -7,22 +7,27 @@ CellProfiler-style outputs (an ``Image`` table plus ``Cells`` / ``Cytoplasm`` /
 ``Nuclei`` compartment tables) anchored to the real BBBC021 dev-subset metadata
 and the synthetic patient assignment.
 
-Feature values are drawn so that three independent, separable signals are baked
-into the single cells, which is exactly what the downstream QC, normalization,
-and (future) batch-correction steps need to demonstrate value:
+Feature values are drawn so that three separable signals are baked into the
+single cells, which is exactly what the downstream QC, normalization, and
+(future) batch-correction steps need to demonstrate value:
 
 - **disease group** -- a per-(disease, feature) shift (the signal to preserve),
 - **mechanism of action** -- a per-(MoA, feature) treatment-response shift,
-- **plate / batch** -- a smaller per-(plate, feature) nuisance shift to correct.
+- **plate / batch** -- a per-(plate, feature) nuisance shift to correct.
 
-Everything is deterministic given a seed. The compartment tables are written as
-real CellProfiler-style CSVs so that :mod:`mock_patient_profile.cytotable_io`
-can perform a genuine CytoTable conversion back into single-cell Parquet.
+:class:`SignalConfig` controls the strength of each signal and the
+within-compartment feature correlation, so the difficulty can be tuned from
+"trivially separable" to "batch overwhelms biology" for method benchmarking
+(the defaults reproduce the original easy mock). Everything is deterministic
+given a seed. The compartment tables are written as real CellProfiler-style
+CSVs so that :mod:`mock_patient_profile.cytotable_io` can perform a genuine
+CytoTable conversion back into single-cell Parquet.
 """
 
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -37,11 +42,34 @@ DEFAULT_CELLS_PER_SITE = 15
 #: Default RNG seed for reproducible feature generation.
 DEFAULT_SEED = 0
 
-#: Relative weights of each signal contributing to a feature's per-cell z-score.
-_WEIGHT_DISEASE = 0.9
-_WEIGHT_MOA = 0.7
-_WEIGHT_PLATE = 0.4
-_WEIGHT_NOISE = 0.7
+
+@dataclass(frozen=True)
+class SignalConfig:
+    """Controls how strong each planted signal is, and feature realism.
+
+    The defaults reproduce the original easy mock (disease dominant, modest
+    batch, independent features). Treat this as your experimental knob: raise
+    ``weight_plate`` above ``weight_disease`` to make batch overwhelm biology,
+    and raise ``feature_correlation`` to give features a realistic within-
+    compartment covariance (so dimensionality reduction / feature selection
+    actually matter).
+
+    Attributes:
+        weight_disease: Weight of the per-(disease, feature) signal to preserve.
+        weight_moa: Weight of the per-(MoA, feature) treatment-response signal.
+        weight_plate: Weight of the per-(plate, feature) batch nuisance signal.
+        weight_noise: Weight of per-cell noise.
+        feature_correlation: In ``[0, 1)``. Correlation injected between the
+            per-cell noise of features sharing a compartment (``0`` = the
+            original independent features).
+    """
+
+    weight_disease: float = 0.9
+    weight_moa: float = 0.7
+    weight_plate: float = 0.4
+    weight_noise: float = 0.7
+    feature_correlation: float = 0.0
+
 
 #: AreaShape measurements (channel-independent) emitted per compartment.
 _AREASHAPE_MEASUREMENTS = (
@@ -157,11 +185,26 @@ def _effect_matrix(
     return coefficients[inverse]
 
 
+def _noise_cholesky(feature_names: list[str], correlation: float) -> np.ndarray:
+    """Cholesky factor of a per-compartment equicorrelation matrix.
+
+    Features sharing a compartment get correlation ``correlation``; features in
+    different compartments stay independent. Used to give the per-cell noise a
+    realistic block covariance structure.
+    """
+    compartments = np.array([name.split("_", 1)[0] for name in feature_names])
+    same_compartment = compartments[:, None] == compartments[None, :]
+    sigma = np.where(same_compartment, correlation, 0.0)
+    np.fill_diagonal(sigma, 1.0)
+    return np.linalg.cholesky(sigma)
+
+
 def simulate_single_cells(
     augmented_table: pl.DataFrame,
     *,
     cells_per_site: int = DEFAULT_CELLS_PER_SITE,
     seed: int = DEFAULT_SEED,
+    signal: SignalConfig | None = None,
 ) -> pl.DataFrame:
     """Simulate the canonical single-cell "ground-truth" table.
 
@@ -172,6 +215,8 @@ def simulate_single_cells(
             ``Metadata_Plate``.
         cells_per_site: Number of cells to generate per imaging site.
         seed: RNG seed.
+        signal: Signal strengths and feature-correlation knobs. Defaults to
+            :class:`SignalConfig` (the original easy mock).
 
     Returns:
         A Polars frame with one row per cell: all input metadata columns plus
@@ -179,6 +224,7 @@ def simulate_single_cells(
     """
     if cells_per_site < 1:
         raise ValueError("cells_per_site must be >= 1")
+    signal = signal or SignalConfig()
 
     sites = augmented_table.sort("Metadata_ImageNumber")
     objects = pl.DataFrame(
@@ -204,12 +250,14 @@ def simulate_single_cells(
         cells["Metadata_Plate"].to_numpy(), "plate", seed, n_features
     )
     noise = np.random.default_rng(seed).standard_normal((n_cells, n_features))
+    if signal.feature_correlation > 0:
+        noise = noise @ _noise_cholesky(feature_names, signal.feature_correlation).T
 
     z = (
-        _WEIGHT_DISEASE * disease
-        + _WEIGHT_MOA * moa
-        + _WEIGHT_PLATE * plate
-        + _WEIGHT_NOISE * noise
+        signal.weight_disease * disease
+        + signal.weight_moa * moa
+        + signal.weight_plate * plate
+        + signal.weight_noise * noise
     )
     values = means * (1.0 + rel_sds * z)
     # Floor at a small fraction of the mean to keep measurements non-negative.
@@ -301,6 +349,7 @@ def generate_synthetic_dataset(
     *,
     cells_per_site: int = DEFAULT_CELLS_PER_SITE,
     seed: int = DEFAULT_SEED,
+    signal: SignalConfig | None = None,
 ) -> tuple[pl.DataFrame, Path]:
     """Simulate single cells and write CellProfiler CSVs under ``interim``.
 
@@ -309,13 +358,14 @@ def generate_synthetic_dataset(
         paths: Data locations. Defaults to :func:`get_data_paths`.
         cells_per_site: Cells generated per site.
         seed: RNG seed.
+        signal: Signal strengths / feature-correlation knobs.
 
     Returns:
         The ``(truth_cells_frame, csv_directory)`` pair.
     """
     paths = paths or get_data_paths()
     cells = simulate_single_cells(
-        augmented_table, cells_per_site=cells_per_site, seed=seed
+        augmented_table, cells_per_site=cells_per_site, seed=seed, signal=signal
     )
     csv_dir = paths.interim / "cellprofiler"
     write_cellprofiler_csvs(cells, augmented_table, csv_dir)

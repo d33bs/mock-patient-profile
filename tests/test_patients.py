@@ -3,6 +3,7 @@ Tests for the synthetic patient metadata layer.
 """
 
 import polars as pl
+import pytest
 
 from mock_patient_profile import bbbc021, patients, schema
 from mock_patient_profile.paths import DataPaths
@@ -97,3 +98,36 @@ def test_assign_patients_is_deterministic() -> None:
     a = patients.assign_patients(image, n_patients=4, seed=0)
     b = patients.assign_patients(image, n_patients=4, seed=0)
     assert a.equals(b)
+
+
+def _diseases_on(frame: pl.DataFrame, plate: str) -> set[str]:
+    return set(
+        frame.filter(pl.col("Metadata_Plate") == plate)["Metadata_DiseaseGroup"]
+        .unique()
+        .to_list()
+    )
+
+
+def test_confounding_segregates_disease_by_plate() -> None:
+    image = _image_table()  # 2 plates x 4 wells
+    balanced = patients.assign_patients(
+        image, n_patients=8, seed=0, disease_plate_confounding=0.0
+    )
+    confounded = patients.assign_patients(
+        image, n_patients=8, seed=0, disease_plate_confounding=1.0
+    )
+
+    # balanced: every plate sees all four disease groups
+    for plate in ("PlateA", "PlateB"):
+        assert len(_diseases_on(balanced, plate)) == len(schema.DISEASE_GROUPS)
+
+    # fully confounded: each plate sees a strict, disjoint subset of diseases
+    a_diseases = _diseases_on(confounded, "PlateA")
+    b_diseases = _diseases_on(confounded, "PlateB")
+    assert len(a_diseases) < len(schema.DISEASE_GROUPS)
+    assert a_diseases.isdisjoint(b_diseases)
+
+
+def test_confounding_validates_range() -> None:
+    with pytest.raises(ValueError, match="confounding"):
+        patients.assign_patients(_image_table(), disease_plate_confounding=1.5)

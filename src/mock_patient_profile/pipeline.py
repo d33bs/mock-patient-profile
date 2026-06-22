@@ -53,6 +53,10 @@ class PipelineConfig:
     n_patients: int = 8
     seed: int = 0
     normalize_method: str = "standardize"
+    #: Disease<->plate confounding strength in [0, 1] (0 = balanced/easy).
+    disease_plate_confounding: float = 0.0
+    #: Signal strengths / feature realism for the generator (None = defaults).
+    signal: synthetic.SignalConfig | None = None
 
 
 def run_from_subset(
@@ -80,12 +84,19 @@ def run_from_subset(
     patient_table = patients.build_patient_table(config.n_patients, seed=config.seed)
     patients.write_patient_table(patient_table, paths)
     augmented = patients.assign_patients(
-        subset, n_patients=config.n_patients, seed=config.seed
+        subset,
+        n_patients=config.n_patients,
+        seed=config.seed,
+        disease_plate_confounding=config.disease_plate_confounding,
     )
 
     # synthetic CellProfiler outputs -> CytoTable -> canonical single-cell Parquet
     _truth, csv_dir = synthetic.generate_synthetic_dataset(
-        augmented, paths, cells_per_site=config.cells_per_site, seed=config.seed
+        augmented,
+        paths,
+        cells_per_site=config.cells_per_site,
+        seed=config.seed,
+        signal=config.signal,
     )
     single_cell_path = cytotable_io.build_single_cell_parquet(csv_dir, augmented, paths)
 

@@ -48,6 +48,7 @@ from .schema import (
     write_parquet,
 )
 from .synthetic import (
+    SignalConfig,
     canonical_feature_names,
     generate_synthetic_dataset,
     simulate_single_cells,

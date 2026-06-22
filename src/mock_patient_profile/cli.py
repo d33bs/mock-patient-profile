@@ -19,6 +19,7 @@ import fire
 
 from .paths import get_data_paths
 from .pipeline import PipelineConfig, run_pipeline
+from .synthetic import SignalConfig
 
 
 def _print_summary(summary: dict[str, object]) -> None:
@@ -49,6 +50,9 @@ class Cli:
         n_patients: int = 8,
         seed: int = 0,
         normalize_method: str = "standardize",
+        disease_plate_confounding: float = 0.0,
+        feature_correlation: float = 0.0,
+        batch_weight: float = 0.4,
         force_download: bool = False,
     ) -> None:
         """Run the full BBBC021 -> patient-profile pipeline.
@@ -61,6 +65,12 @@ class Cli:
             n_patients: Size of the synthetic patient cohort.
             seed: Random seed for reproducibility.
             normalize_method: pycytominer normalization method.
+            disease_plate_confounding: Disease<->plate confounding in [0, 1]
+                (0 = balanced/easy; 1 = disease confounded with batch).
+            feature_correlation: Within-compartment feature correlation in
+                [0, 1) for realism (0 = independent features).
+            batch_weight: Strength of the per-plate batch signal (raise above the
+                disease weight, ~0.9, to make batch overwhelm biology).
             force_download: Force re-download of BBBC021 metadata.
         """
         paths = get_data_paths(data_dir)
@@ -70,6 +80,11 @@ class Cli:
             n_patients=n_patients,
             seed=seed,
             normalize_method=normalize_method,
+            disease_plate_confounding=disease_plate_confounding,
+            signal=SignalConfig(
+                weight_plate=batch_weight,
+                feature_correlation=feature_correlation,
+            ),
         )
         summary = run_pipeline(paths, config=config, force_download=force_download)
         _print_summary(summary)

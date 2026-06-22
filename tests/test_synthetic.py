@@ -2,6 +2,7 @@
 Tests for the synthetic CellProfiler-style feature generator.
 """
 
+import numpy as np
 import polars as pl
 
 from mock_patient_profile import schema, synthetic
@@ -105,3 +106,60 @@ def test_write_cellprofiler_csvs(tmp_path) -> None:
 
     cyto_csv = pl.read_csv(written["Cytoplasm"])
     assert {"Parent_Cells", "Parent_Nuclei"} <= set(cyto_csv.columns)
+
+
+def _mean_abs_offdiag_corr(cells: pl.DataFrame, features: list[str]) -> float:
+    matrix = cells.select(features).to_numpy()
+    corr = np.corrcoef(matrix, rowvar=False)
+    offdiag = corr[~np.eye(corr.shape[0], dtype=bool)]
+    return float(np.mean(np.abs(offdiag)))
+
+
+def test_feature_correlation_increases_empirical_correlation() -> None:
+    table = _augmented_table()
+    cells_features = [
+        f for f in synthetic.canonical_feature_names() if f.startswith("Cells_")
+    ]
+    independent = synthetic.simulate_single_cells(table, cells_per_site=200, seed=0)
+    correlated = synthetic.simulate_single_cells(
+        table,
+        cells_per_site=200,
+        seed=0,
+        signal=synthetic.SignalConfig(feature_correlation=0.6),
+    )
+    assert _mean_abs_offdiag_corr(correlated, cells_features) > _mean_abs_offdiag_corr(
+        independent, cells_features
+    )
+
+
+def test_batch_weight_increases_plate_separation() -> None:
+    table = _augmented_table()  # two plates
+    features = synthetic.canonical_feature_names()
+
+    def plate_separation(cells: pl.DataFrame) -> float:
+        a = (
+            cells.filter(pl.col("Metadata_Plate") == "PlateA")
+            .select(features)
+            .to_numpy()
+        )
+        b = (
+            cells.filter(pl.col("Metadata_Plate") == "PlateB")
+            .select(features)
+            .to_numpy()
+        )
+        spread = cells.select(features).to_numpy().std(axis=0) + 1e-9
+        return float(np.mean(np.abs(a.mean(0) - b.mean(0)) / spread))
+
+    weak = synthetic.simulate_single_cells(
+        table,
+        cells_per_site=100,
+        seed=0,
+        signal=synthetic.SignalConfig(weight_plate=0.1),
+    )
+    strong = synthetic.simulate_single_cells(
+        table,
+        cells_per_site=100,
+        seed=0,
+        signal=synthetic.SignalConfig(weight_plate=3.0),
+    )
+    assert plate_separation(strong) > plate_separation(weak)

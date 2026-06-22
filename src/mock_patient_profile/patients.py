@@ -89,44 +89,105 @@ def build_patient_table(
     )
 
 
+def _confounded_patient_indices(
+    plates: list[str],
+    n_patients: int,
+    diseases: list[str],
+    confounding: float,
+    seed: int,
+) -> list[int]:
+    """Assign each (sorted) well to a patient index, optionally confounding plate.
+
+    At ``confounding=0`` this is the plain global round-robin (each well's patient
+    is its global index mod ``n_patients``). At ``confounding=1`` every well is
+    assigned to a patient whose disease's "home plate" matches the well's plate,
+    so disease group becomes predictable from plate (a realistic batch confound).
+    Intermediate values mix the two per well via a seeded draw.
+    """
+    unique_plates = sorted(set(plates))
+    n_plates = len(unique_plates)
+    plate_index = {plate: i for i, plate in enumerate(unique_plates)}
+    disease_index = {group: i for i, group in enumerate(schema.DISEASE_GROUPS)}
+
+    # Each disease group gets a home plate; each plate's "home patients" are those
+    # whose disease maps there (fall back to all patients if a plate has none).
+    home_plate = [disease_index[diseases[p]] % n_plates for p in range(n_patients)]
+    home_patients = {
+        pi: [p for p in range(n_patients) if home_plate[p] == pi]
+        for pi in range(n_plates)
+    }
+    for pi, members in home_patients.items():
+        if not members:
+            home_patients[pi] = list(range(n_patients))
+
+    rng = np.random.default_rng(seed)
+    plate_counter = dict.fromkeys(range(n_plates), 0)
+    assignments = []
+    for global_counter, plate in enumerate(plates):
+        pi = plate_index[plate]
+        global_idx = global_counter % n_patients
+        members = home_patients[pi]
+        confounded_idx = members[plate_counter[pi] % len(members)]
+        plate_counter[pi] += 1
+        use_confounded = rng.random() < confounding
+        assignments.append(confounded_idx if use_confounded else global_idx)
+    return assignments
+
+
 def assign_patients(
     image_table: pl.DataFrame,
     n_patients: int = DEFAULT_N_PATIENTS,
     *,
     seed: int = DEFAULT_SEED,
+    disease_plate_confounding: float = 0.0,
 ) -> pl.DataFrame:
     """Attach patient/sample metadata to a site-level image table.
 
-    Each unique ``(Metadata_Plate, Metadata_Well)`` becomes a sample and is
-    assigned to a patient round-robin (over wells sorted deterministically), so
-    every patient appears on multiple plates and treatments. The plate doubles
-    as the imaging batch.
+    Each unique ``(Metadata_Plate, Metadata_Well)`` becomes a sample assigned to
+    a patient. The plate doubles as the imaging batch.
 
     Args:
         image_table: A canonicalized site-level image table (see
             :func:`mock_patient_profile.bbbc021.build_dev_subset`).
         n_patients: Number of patients in the cohort.
         seed: RNG seed for the cohort.
+        disease_plate_confounding: In ``[0, 1]``. ``0`` spreads each patient (and
+            disease group) evenly across plates (the easy, balanced default).
+            ``1`` concentrates each disease group on plate(s), so disease becomes
+            confounded with batch -- the realistic, hard case for downstream
+            normalization / batch correction to disentangle.
 
     Returns:
         ``image_table`` augmented with ``Metadata_SampleID``,
         ``Metadata_Batch``, ``Metadata_PatientID``, ``Metadata_DiseaseGroup``,
         ``Metadata_FailureType``, ``Metadata_Age``, and ``Metadata_Sex``.
     """
-    patients = build_patient_table(n_patients, seed=seed).with_row_index("_patient_idx")
+    if not 0.0 <= disease_plate_confounding <= 1.0:
+        raise ValueError("disease_plate_confounding must be in [0, 1]")
+
+    patients = build_patient_table(n_patients, seed=seed)
+    diseases = patients["Metadata_DiseaseGroup"].to_list()
 
     wells = (
         image_table.select(["Metadata_Plate", "Metadata_Well"])
         .unique()
         .sort(["Metadata_Plate", "Metadata_Well"])
-        .with_row_index("_well_idx")
-        .with_columns(
-            _patient_idx=(pl.col("_well_idx") % n_patients).cast(pl.UInt32),
+    )
+    assignments = _confounded_patient_indices(
+        wells["Metadata_Plate"].to_list(),
+        n_patients,
+        diseases,
+        disease_plate_confounding,
+        seed,
+    )
+    wells = (
+        wells.with_columns(
+            _patient_idx=pl.Series(assignments, dtype=pl.UInt32),
             Metadata_SampleID=pl.col("Metadata_Plate") + "_" + pl.col("Metadata_Well"),
             Metadata_Batch=pl.col("Metadata_Plate"),
         )
-        .join(patients, on="_patient_idx", how="left")
-        .drop("_well_idx", "_patient_idx")
+        .join(patients.with_row_index("_patient_idx"), on="_patient_idx", how="left")
+        .drop("_patient_idx")
     )
 
     return image_table.join(wells, on=["Metadata_Plate", "Metadata_Well"], how="left")
