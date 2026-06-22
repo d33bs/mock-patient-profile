@@ -16,4 +16,10 @@ abstract: >-
   Mock patient-aware morphology profiling workflow prototyping a patient-derived fibroblast Cell Painting architecture using BBBC021, CytoTable, CytoDataFrame, coSMicQC, and pycytominer.
 keywords:
   - python
+  - cell-painting
+  - morphology-profiling
+  - image-based-profiling
+  - bbbc021
+  - pycytominer
+  - cytotable
 license: BSD-3-Clause
