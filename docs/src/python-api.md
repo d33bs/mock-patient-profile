@@ -60,9 +60,14 @@ the workflow stages. Each is independently usable and documented below.
    :show-inheritance:
 ```
 
-## Multi-omic integration and orchestration
+## Evaluation, multi-omic integration, and orchestration
 
 ```{eval-rst}
+.. automodule:: src.mock_patient_profile.evaluation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. automodule:: src.mock_patient_profile.multiomics
    :members:
    :undoc-members:

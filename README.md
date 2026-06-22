@@ -126,10 +126,41 @@ stand-in for the eventual real screen.
 | [`qc`](src/mock_patient_profile/qc.py)                                                        | coSMicQC reporting workflow (Milestone 4)                       |
 | [`profiling`](src/mock_patient_profile/profiling.py)                                          | pycytominer profiling workflow (Milestone 5)                    |
 | [`multiomics`](src/mock_patient_profile/multiomics.py)                                        | Mock clinical/snRNA tables + DuckDB join (Milestone 8)          |
+| [`evaluation`](src/mock_patient_profile/evaluation.py)                                        | Quantitative profile-quality metrics (benchmark scorecard)      |
 | [`pipeline`](src/mock_patient_profile/pipeline.py) / [`cli`](src/mock_patient_profile/cli.py) | End-to-end orchestration + CLI                                  |
 
 A runnable, step-by-step walkthrough lives in
 [`src/notebooks/example_notebook.py`](src/notebooks/example_notebook.py).
+
+## Analysis and benchmarking
+
+The [`evaluation`](src/mock_patient_profile/evaluation.py) module attaches
+numbers to analysis choices via a tidy scorecard — replicate reproducibility
+(mAP), disease separation (silhouette + classifier), and batch leakage
+(classifier + kNN mixing) — so you can compare a method before/after:
+
+```python
+from mock_patient_profile import evaluation, get_data_paths
+
+evaluation.benchmark_from_paths(get_data_paths())  # scores well_profiles.parquet
+```
+
+Because the default mock plants signal linearly with batch balanced across
+disease, those metrics look easy. The generator exposes difficulty knobs to make
+them discriminating — disease↔batch confounding, a batch signal that can
+overwhelm biology, and realistic correlated features:
+
+```bash
+# hard case: disease confounded with plate, batch >> biology, correlated features
+uv run mock-patient-profile run --disease_plate_confounding 1.0 \
+    --batch_weight 3.0 --feature_correlation 0.5
+```
+
+On the easy default `batch_classifier_balacc` sits near chance (~0.5) and
+`batch_mixing_ratio` near 1.0; under the hard config they go to ~1.0 and ~0.0 —
+a concrete target for a batch-correction step to recover. See
+[`SignalConfig`](src/mock_patient_profile/synthetic.py) for full programmatic
+control of the signal model.
 
 ## Development
 
@@ -151,12 +182,15 @@ MOCK_PATIENT_PROFILE_RUN_NETWORK=1 uv run pytest -m network   # real download
 
 The initial milestones (ingestion, schema, patient layer, the four Way Science
 integrations, end-to-end example, and lightweight multi-omic joins) are
-implemented. Intentional non-goals for now: deep-learning / foundation-model
-workflows, full single-cell genomics (snRNA-seq is summary-only), and
-vendor-specific tooling. Batch-correction benchmarking (robust z-score,
-sphering, Harmony, ComBat) is the natural next milestone and is left as future
-work; the normalization workflow already supports `standardize`,
-`mad_robustize`, and `spherize`.
+implemented, along with an evaluation scorecard and tunable generator difficulty
+(confounding / signal strength / feature correlation) for method benchmarking.
+Intentional non-goals for now: deep-learning / foundation-model workflows, full
+single-cell genomics (snRNA-seq is summary-only), and vendor-specific tooling.
+
+The natural next milestone is the batch-correction methods themselves (robust
+z-score, sphering, Harmony, ComBat) scored with the `evaluation` harness; the
+normalization workflow already supports `standardize`, `mad_robustize`, and
+`spherize`, and `evaluation.benchmark` provides the readouts to compare them.
 
 The architecture is designed so that swapping the synthetic feature generator for
 real CellProfiler output — and the synthetic patient layer for a real cohort — is
