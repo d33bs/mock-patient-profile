@@ -11,6 +11,7 @@ from . import (
     bbbc021,
     cytodataframe_io,
     cytotable_io,
+    multiomics,
     paths,
     patients,
     profiling,
@@ -22,6 +23,7 @@ from .bbbc021 import build_dev_subset, download_bbbc021_metadata, prepare_dev_su
 from .cytodataframe_io import cell_counts, hierarchy_summary, load_single_cells
 from .cytotable_io import build_single_cell_parquet, convert_cellprofiler_csvs
 from .main import show_message
+from .multiomics import build_multiomic_tables, integrate_multiomics
 from .paths import DataPaths, get_data_paths
 from .patients import assign_patients, build_patient_table
 from .profiling import aggregate_to_wells, build_patient_profiles, normalize_profiles
