@@ -2516,6 +2516,7 @@ dependencies = [
     { name = "polars" },
     { name = "pyarrow" },
     { name = "pycytominer" },
+    { name = "scikit-learn" },
     { name = "tabulate" },
 ]
 
@@ -2552,6 +2553,7 @@ requires-dist = [
     { name = "polars", specifier = ">=1" },
     { name = "pyarrow", specifier = ">=16" },
     { name = "pycytominer" },
+    { name = "scikit-learn", specifier = ">=1.9.0" },
     { name = "tabulate", specifier = ">=0.9" },
 ]
 

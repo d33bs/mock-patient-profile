@@ -36,6 +36,7 @@ dependencies = [
   "polars>=1",
   "pyarrow>=16",
   "pycytominer",
+  "scikit-learn>=1.9",
   "tabulate>=0.9",
 ]
 scripts.mock-patient-profile = "mock_patient_profile.cli:trigger"
@@ -98,9 +99,9 @@ lint.select = [
 lint.ignore = [ "PLC0415" ]
 # Ignore `F401` (unused imports) for `__init__.py` file
 lint.per-file-ignores."__init__.py" = [ "F401" ]
-# Tests use literal expected values and pytest fixture args idiomatically;
-# allow magic-value comparisons and missing fixture-argument annotations.
-lint.per-file-ignores."tests/*" = [ "ANN001", "PLR2004" ]
+# Tests use literal expected values, pytest fixture args, and many-knob data
+# builders idiomatically; relax the corresponding lints.
+lint.per-file-ignores."tests/*" = [ "ANN001", "PLR0913", "PLR2004" ]
 
 [tool.vulture]
 paths = [ "src/mock_patient_profile", "tests" ]
