@@ -1,0 +1,23 @@
+---
+cff-version: 1.2.0
+title: mock-patient-profile
+message: >-
+  If you use this software, please cite it using the
+  metadata from the CITATION.cff file.
+type: software
+authors:
+  - given-names: Dave
+    family-names: Bunten
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/d33bs/mock-patient-profile"
+abstract: >-
+  Mock patient-aware morphology profiling workflow prototyping a patient-derived fibroblast Cell Painting architecture using BBBC021, CytoTable, CytoDataFrame, coSMicQC, and pycytominer.
+keywords:
+  - python
+  - cell-painting
+  - morphology-profiling
+  - image-based-profiling
+  - bbbc021
+  - pycytominer
+  - cytotable
+license: BSD-3-Clause
