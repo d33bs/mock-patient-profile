@@ -29,11 +29,9 @@ jobs:
   run_tests:
     strategy:
       matrix:
-        python_version: ["3.11", "3.12", "3.13"]
-        os: [ubuntu-24.04, macos-14]
-    runs-on: ${{ matrix.os }}
-    env:
-      OS: ${{ matrix.os }}
+        # keep CI small for a prototype: Linux only, at the supported-range ends
+        python_version: ["3.11", "3.13"]
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
