@@ -42,7 +42,7 @@ def _print_summary(summary: dict[str, object]) -> None:
 class Cli:
     """mock-patient-profile commands."""
 
-    def run(  # noqa: PLR0913
+    def run(  # noqa: PLR0913, PLR0917
         self,
         data_dir: str | None = None,
         n_plates: int = 2,
