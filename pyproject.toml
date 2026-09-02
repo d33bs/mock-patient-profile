@@ -121,10 +121,10 @@ ini_options.markers = [
 ]
 
 [tool.coverage]
-run.branch = true
 run.source = [ "src/mock_patient_profile" ]
-report.show_missing = true
+run.branch = true
 report.skip_covered = true
+report.show_missing = true
 
 [tool.jupytext]
 formats = "ipynb,py:light"
